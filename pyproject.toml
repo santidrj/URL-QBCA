@@ -1,0 +1,20 @@
+[tool.poetry]
+name = "url-qbca"
+version = "0.1.0"
+description = ""
+authors = ["Santiago del Rey <59149491+santidrj@users.noreply.github.com>"]
+
+[tool.poetry.dependencies]
+python = "^3.9"
+numpy = "^1.22.2"
+scikit-learn = "^1.0.2"
+
+[tool.poetry.dev-dependencies]
+isort = "^5.10.1"
+mypy = "^0.931"
+bandit = "^1.7.2"
+black = "^22.1.0"
+
+[build-system]
+requires = ["poetry-core>=1.0.0"]
+build-backend = "poetry.core.masonry.api"
