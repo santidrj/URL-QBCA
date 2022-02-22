@@ -8,6 +8,7 @@ authors = ["Santiago del Rey <59149491+santidrj@users.noreply.github.com>"]
 python = "^3.9"
 numpy = "^1.22.2"
 scikit-learn = "^1.0.2"
+pandas = "^1.4.1"
 
 [tool.poetry.dev-dependencies]
 isort = "^5.10.1"
