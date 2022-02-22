@@ -1,18 +1,7 @@
+import heapq
 import math
 
 import numpy as np
-
-
-def compute_epsilon(lambas, x):
-    res = np.ndarray(x.shape)
-    for i, p in enumerate(x):
-        for j, l in enumerate(p):
-            l_min = x[:, j].min()
-            if l == l_min:
-                res[i, j] = 1
-            else:
-                res[i, j] = np.ceil((l - l_min) / lambas[j])
-    return res
 
 
 class QBCA:
@@ -34,14 +23,14 @@ class QBCA:
         self.m_dims = x.shape[-1]
         self.n_bins = math.floor(math.log(x.shape[0], self.m_dims))
         self.bin_size = (np.max(x, axis=0) - np.min(x, axis=0)) / self.n_bins
-        self.bins = np.zeros(self.n_bins * self.m_dims, type=int)
+        self.bins = np.zeros(self.n_bins ** self.m_dims, dtype=int)
         self.min_values = np.min(x, axis=0)
 
     def _quantize_point(self, point):
         epsilon = point.copy()
-        mask = (point == self.min_values)
+        mask = point == self.min_values
         epsilon[mask] = 1
-        epsilon[~mask] = (point[~mask] - self.min_values[~mask])
+        epsilon[~mask] = point[~mask] - self.min_values[~mask]
         epsilon = np.ceil(epsilon / self.bin_size)
         p = np.full_like(epsilon, self.bin_size)
         exp = np.arange(self.m_dims - 1, -1, -1)
@@ -54,8 +43,13 @@ class QBCA:
             self.bins[idxs] += 1
 
     def _get_non_zero_bins(self):
-        return self.bins[self.bins != 0]
+        non_zero_bins = np.where(self.bins != 0)
+        return self.bins[non_zero_bins], non_zero_bins[0]
 
     def _cci(self, n_seeds):
         seed_list = np.zeros((n_seeds, self.m_dims))
-        non_zero_bins = self._get_non_zero_bins()
+        non_zero_bins, non_zero_bins_idx = self._get_non_zero_bins()
+
+        # Negate non_zero_bins values to simulate a max_heap
+        max_heap = np.stack((-non_zero_bins, non_zero_bins_idx)).T
+        heapq.heapify(max_heap.tolist())
