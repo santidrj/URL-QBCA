@@ -5,4 +5,4 @@ file = "test.csv"
 data = read_datafile(file)
 
 if __name__ == "__main__":
-    QBCA(3).fit(data)
+    QBCA(2).fit(data)

@@ -3,6 +3,7 @@ import math
 from itertools import product
 
 import numpy as np
+from scipy.spatial.distance import euclidean
 
 from source.data_structures import MaxHeap
 
@@ -14,6 +15,7 @@ class QBCA:
     def fit(self, x):
         self._quantization(x)
         self._cluster_center_initialization()
+        self._cluster_center_assignment()
         pass
 
     def predict(self, x):
@@ -55,9 +57,10 @@ class QBCA:
 
     def _cluster_center_initialization(self):
         # Create Max-Heap with the non-zero bins
-        non_zero_bins, non_zero_bins_idx = self._get_non_zero_bins()
+        non_empty_bins = self._get_non_empty_bins()
         max_heap = MaxHeap()
-        [max_heap.heappush((x[0], x[1])) for x in np.stack((non_zero_bins, non_zero_bins_idx)).T]
+        for b in np.stack(non_empty_bins).T:
+            max_heap.heappush(tuple(b))
         aux_heap = copy.copy(max_heap)
         seed_list = []
 
@@ -71,14 +74,62 @@ class QBCA:
 
         # If there are not enough seeds
         if len(seed_list) < self.n_seeds:
-            seed_list.extend([x for x in aux_heap if x not in seed_list][: self.n_seeds - len(seed_list)])
+            seed_list.extend(
+                [x for x in aux_heap if x not in seed_list][
+                : self.n_seeds - len(seed_list)
+                ]
+            )
+
         seed_list.sort(key=self._bin_cardinality)
 
-        self.seeds = np.zeros((self.n_seeds, self.m_dims))
-        for s_idx, (_, b_idx) in enumerate(seed_list[:self.n_seeds]):
-            self.seeds[s_idx] = self._compute_center(self.bins[b_idx])
+        # self.seeds = np.zeros((self.n_seeds, self.m_dims))
+        self.seeds = np.array(
+            [
+                self._compute_center(self.bins[b_idx])
+                for (_, b_idx) in seed_list[: self.n_seeds]
+            ]
+        )
+        # for s_idx, (_, b_idx) in enumerate(seed_list[:self.n_seeds]):
+        #     self.seeds[s_idx] = self._compute_center(self.bins[b_idx])
 
-    def _get_non_zero_bins(self):
+    def _cluster_center_assignment(self):
+        non_empty_bins, non_empty_bins_idx = self._get_non_empty_bins()
+        coordinates = np.array(
+            np.unravel_index(non_empty_bins_idx, self.hist_shape)
+        ).transpose()
+        min_coords = self.bin_size * coordinates
+        max_coords = self.bin_size * (coordinates + 1)
+        min_max_distances = self._compute_min_max_distances(
+            max_coords, min_coords, non_empty_bins
+        )
+        # TODO: finish this
+
+    def _compute_min_max_distances(self, max_coords, min_coords, non_empty_bins):
+        max_distances = self._compute_max_distances(
+            max_coords, min_coords, non_empty_bins
+        )
+        return np.min(max_distances, axis=1)
+
+    def _compute_max_distances(self, max_coords, min_coords, non_empty_bins):
+        threshold = (min_coords + max_coords) / 2
+        max_distances = np.zeros((len(non_empty_bins), len(self.seeds)))
+        for i, t in enumerate(threshold):
+            upsilon = np.zeros(self.seeds.shape)
+            mask = self.seeds >= t
+            min_coord = np.tile(min_coords[i], (upsilon.shape[0], 1))
+            max_coord = np.tile(max_coords[i], (upsilon.shape[0], 1))
+            upsilon[mask] = min_coord[mask]
+            upsilon[~mask] = max_coord[~mask]
+            max_distances[i] = np.array(
+                [euclidean(s, u) for s, u in zip(self.seeds, upsilon)]
+            )
+        return max_distances
+
+    def _get_non_empty_bins(self):
+        """
+        Get the non-empty histogram bins.
+        :return: A tuple with the bin cardinality and its index.
+        """
         non_zero_bins = np.where(self.bin_counts != 0)
         return self.bin_counts[non_zero_bins], non_zero_bins[0]
 
@@ -104,3 +155,6 @@ class QBCA:
 
     def _compute_center(self, cluster):
         return np.mean(np.array(cluster), axis=0)
+
+    def _compute_maximum_distance(self, bins, seeds):
+        pass
