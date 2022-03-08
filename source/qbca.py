@@ -102,6 +102,12 @@ class QBCA:
         min_max_distances = self._compute_min_max_distances(
             max_coords, min_coords, non_empty_bins
         )
+        min_distances = self._compute_min_distances(
+            max_coords, min_coords, non_empty_bins
+        )
+
+        candidates = min_distances.transpose() <= min_max_distances
+        self.seed_points = [[] for _ in range(len(self.seeds))]
         # TODO: finish this
 
     def _compute_min_max_distances(self, max_coords, min_coords, non_empty_bins):
@@ -156,5 +162,18 @@ class QBCA:
     def _compute_center(self, cluster):
         return np.mean(np.array(cluster), axis=0)
 
-    def _compute_maximum_distance(self, bins, seeds):
-        pass
+    def _compute_min_distances(self, max_coords, min_coords, non_empty_bins):
+        min_distances = np.zeros((len(non_empty_bins), len(self.seeds)))
+        for i, b in enumerate(non_empty_bins):
+            lb = self.seeds.copy()
+            mask_1 = self.seeds < min_coords[i]
+            mask_2 = self.seeds > max_coords[i]
+            min_coord = np.tile(min_coords[i], (lb.shape[0], 1))
+            max_coord = np.tile(max_coords[i], (lb.shape[0], 1))
+            lb[mask_1] = min_coord[mask_1]
+            lb[mask_2] = max_coord[mask_2]
+            min_distances[i] = np.array(
+                [euclidean(s, u) for s, u in zip(self.seeds, lb)]
+            )
+
+        return min_distances
