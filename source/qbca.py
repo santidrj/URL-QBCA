@@ -3,32 +3,42 @@ import math
 from itertools import product
 
 import numpy as np
-from scipy.spatial.distance import euclidean
+from scipy.spatial.distance import cdist, euclidean
 
 from source.data_structures import MaxHeap
 
 
 class QBCA:
-    def __init__(self, n_seeds):
+    def __init__(self, n_seeds=2, threshold=0.001, max_iter=50):
         self.n_seeds = n_seeds
+        self.threshold = threshold
+        self.max_iter = max_iter
 
-    def fit(self, x):
-        self._quantization(x)
+    def fit(self, X):
+        self._quantization(X)
         self._cluster_center_initialization()
-        self._cluster_center_assignment()
-        pass
+        delta = self.threshold + 1
+        n_iter = 0
+        while delta > self.threshold and n_iter < self.max_iter:
+            self._cluster_center_assignment()
+            self._recompute_cluster_centers()
+            delta = self._compute_termination_criteria()
+            n_iter += 1
 
-    def predict(self, x):
-        pass
+        return self
 
-    def fit_predict(self, x):
-        pass
+    def predict(self, X):
+        return self._build_output_prediction(X)
 
-    def _initialize_bins(self, x):
-        self.m_dims = x.shape[-1]
-        self.min_values = np.min(x, axis=0)
-        self.n_bins = math.floor(math.log(x.shape[0], self.m_dims))
-        self.bin_size = (np.max(x, axis=0) - np.min(x, axis=0)) / self.n_bins
+    def fit_predict(self, X):
+        self.fit(X)
+        return self.predict(X)
+
+    def _initialize_bins(self, X):
+        self.m_dims = X.shape[-1]
+        self.min_values = np.min(X, axis=0)
+        self.n_bins = math.floor(math.log(X.shape[0], self.m_dims))
+        self.bin_size = (np.max(X, axis=0) - np.min(X, axis=0)) / self.n_bins
         self.bin_counts = np.zeros(self.n_bins ** self.m_dims, dtype=int)
         self.bins = [[] for _ in range(self.n_bins ** self.m_dims)]
         self.hist_shape = tuple([self.n_bins] * self.m_dims)
@@ -106,9 +116,15 @@ class QBCA:
             max_coords, min_coords, non_empty_bins
         )
 
-        candidates = min_distances.transpose() <= min_max_distances
+        candidates = (min_distances.transpose() <= min_max_distances).transpose()
         self.seed_points = [[] for _ in range(len(self.seeds))]
-        # TODO: finish this
+        for i, idx in enumerate(non_empty_bins_idx):
+            points = np.array(self.bins[idx])
+            distances = cdist(points, self.seeds[candidates[i]])
+            candidates_idx = np.where(candidates[i])[0]
+            closest_seed = np.argmin(distances, axis=1)
+            for j, cs in enumerate(closest_seed):
+                self.seed_points[candidates_idx[cs]].append(points[j])
 
     def _compute_min_max_distances(self, max_coords, min_coords, non_empty_bins):
         max_distances = self._compute_max_distances(
@@ -177,3 +193,23 @@ class QBCA:
             )
 
         return min_distances
+
+    def _recompute_cluster_centers(self):
+        self.old_seeds = self.seeds.copy()
+        for idx, _ in enumerate(self.seed_points):
+            self.seeds[idx] = self._compute_center(self.seed_points[idx])
+
+    def _compute_termination_criteria(self):
+        phi = ((self.old_seeds - self.seeds) ** 2).sum(axis=1)
+        return phi.sum() / self.n_seeds
+
+    def _build_output_prediction(self, X):
+        out = np.zeros_like(X)
+        y = np.zeros(X.shape[0], dtype=int)
+        processed = 0
+        for seed, points in enumerate(self.seed_points):
+            if points:
+                out[processed: processed + len(points), :] = points
+                y[processed: processed + len(points)] = seed
+                processed += len(points)
+        return out, y
