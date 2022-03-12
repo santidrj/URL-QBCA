@@ -15,12 +15,13 @@ class QBCA:
         self.max_iter = max_iter
 
     def fit(self, X):
-        self._quantization(X)
-        self._cluster_center_initialization(X)
+        x = X.copy()
+        self._quantization(x)
+        self._cluster_center_initialization(x)
         delta = self.threshold + 1
         n_iter = 0
         while delta > self.threshold and n_iter < self.max_iter:
-            self._cluster_center_assignment(X)
+            self._cluster_center_assignment(x)
             self._recompute_cluster_centers()
             delta = self._compute_termination_criteria()
             n_iter += 1
@@ -29,7 +30,8 @@ class QBCA:
 
     def predict(self, X):
         # TODO: finish method
-        return self._build_output_prediction(X)
+        x = X.copy()
+        return self._build_output_prediction(x)
 
     def fit_predict(self, X):
         self.fit(X)
@@ -50,28 +52,28 @@ class QBCA:
         self.neighbors_mask = np.array(aux_list)
 
     # TODO: uncomment
-    def _quantize_point(self, point):
-        epsilon = point.copy()
-        mask = point == self.min_values
-        epsilon[mask] = 1
-        epsilon[~mask] = point[~mask] - self.min_values[~mask]
-        epsilon = np.ceil(epsilon / self.bin_size)
-        p = np.full_like(epsilon, self.bins_per_dim)
-        exp = np.arange(self.m_dims - 1, -1, -1)
-        # TODO: check this
-        # return np.sum((epsilon - 1) * (p ** exp) + epsilon[-1]).astype(int)
-        bin_idx = np.sum((epsilon - 1) * (p ** exp)).astype(int)
-        return bin_idx
-
     # def _quantize_point(self, point):
+    #     epsilon = point.copy()
     #     mask = point == self.min_values
-    #     point[mask] = 1
-    #     point[~mask] = point[~mask] - self.min_values[~mask]
-    #     point = np.ceil(point / self.bin_size)
-    #     p = np.full_like(point, self.bins_per_dim)
+    #     epsilon[mask] = 1
+    #     epsilon[~mask] = point[~mask] - self.min_values[~mask]
+    #     epsilon = np.ceil(epsilon / self.bin_size)
+    #     p = np.full_like(epsilon, self.bins_per_dim)
     #     exp = np.arange(self.m_dims - 1, -1, -1)
-    #     bin_idx = np.sum((point - 1) * (p ** exp)).astype(int)
+    #     # TODO: check this
+    #     # return np.sum((epsilon - 1) * (p ** exp) + epsilon[-1]).astype(int)
+    #     bin_idx = np.sum((epsilon - 1) * (p ** exp)).astype(int)
     #     return bin_idx
+
+    def _quantize_point(self, point):
+        mask = point == self.min_values
+        point[mask] = 1
+        point[~mask] = point[~mask] - self.min_values[~mask]
+        point = np.ceil(point / self.bin_size)
+        p = np.full_like(point, self.bins_per_dim)
+        exp = np.arange(self.m_dims - 1, -1, -1)
+        bin_idx = np.sum((point - 1) * (p ** exp)).astype(int)
+        return bin_idx
 
     def _quantization(self, X):
         self._initialize_bins(X)
@@ -86,7 +88,7 @@ class QBCA:
         max_heap = MaxHeap()
         for b in np.stack(non_empty_bins).T:
             max_heap.heappush(tuple(b))
-        aux_heap = copy.copy(max_heap)
+        aux_heap = copy.deepcopy(max_heap)
         seed_list = []
 
         while len(max_heap) > 0:
