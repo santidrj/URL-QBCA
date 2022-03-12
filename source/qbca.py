@@ -16,11 +16,11 @@ class QBCA:
 
     def fit(self, X):
         self._quantization(X)
-        self._cluster_center_initialization()
+        self._cluster_center_initialization(X)
         delta = self.threshold + 1
         n_iter = 0
         while delta > self.threshold and n_iter < self.max_iter:
-            self._cluster_center_assignment()
+            self._cluster_center_assignment(X)
             self._recompute_cluster_centers()
             delta = self._compute_termination_criteria()
             n_iter += 1
@@ -28,6 +28,7 @@ class QBCA:
         return self
 
     def predict(self, X):
+        # TODO: finish method
         return self._build_output_prediction(X)
 
     def fit_predict(self, X):
@@ -48,6 +49,7 @@ class QBCA:
         aux_list.remove(tuple(np.zeros(self.m_dims)))
         self.neighbors_mask = np.array(aux_list)
 
+    # TODO: uncomment
     def _quantize_point(self, point):
         epsilon = point.copy()
         mask = point == self.min_values
@@ -58,16 +60,27 @@ class QBCA:
         exp = np.arange(self.m_dims - 1, -1, -1)
         # TODO: check this
         # return np.sum((epsilon - 1) * (p ** exp) + epsilon[-1]).astype(int)
-        return np.sum((epsilon - 1) * (p ** exp)).astype(int)
+        bin_idx = np.sum((epsilon - 1) * (p ** exp)).astype(int)
+        return bin_idx
+
+    # def _quantize_point(self, point):
+    #     mask = point == self.min_values
+    #     point[mask] = 1
+    #     point[~mask] = point[~mask] - self.min_values[~mask]
+    #     point = np.ceil(point / self.bin_size)
+    #     p = np.full_like(point, self.bins_per_dim)
+    #     exp = np.arange(self.m_dims - 1, -1, -1)
+    #     bin_idx = np.sum((point - 1) * (p ** exp)).astype(int)
+    #     return bin_idx
 
     def _quantization(self, X):
         self._initialize_bins(X)
         idxs = np.apply_along_axis(self._quantize_point, axis=1, arr=X)
-        for idx, point in zip(idxs, X):
+        for point, idx in enumerate(idxs):
             self.bins_cardinality[idx] += 1
             self.bins[idx].append(point)
 
-    def _cluster_center_initialization(self):
+    def _cluster_center_initialization(self, X):
         # Create Max-Heap with the non-zero bins
         non_empty_bins = self._get_non_empty_bins()
         max_heap = MaxHeap()
@@ -97,12 +110,12 @@ class QBCA:
         # self.seeds = np.zeros((self.n_seeds, self.m_dims))
         self.seeds = np.array(
             [
-                self._compute_center(self.bins[b_idx])
-                for (_, b_idx) in seed_list[: self.n_seeds]
+                self._compute_center(X[self.bins[b_idx]])
+                for (_, b_idx) in seed_list[: self.n_seeds] if self.bins[b_idx]
             ]
         )
 
-    def _cluster_center_assignment(self):
+    def _cluster_center_assignment(self, X):
         non_empty_bins, non_empty_bins_idx = self._get_non_empty_bins()
         coordinates = np.array(
             np.unravel_index(non_empty_bins_idx, self.hist_shape)
@@ -118,13 +131,15 @@ class QBCA:
 
         candidates = (min_distances.transpose() <= min_max_distances).transpose()
         self.seed_points = [[] for _ in range(len(self.seeds))]
+        self.seed_point_indices = [[] for _ in range(len(self.seeds))]
         for i, idx in enumerate(non_empty_bins_idx):
-            points = np.array(self.bins[idx])
+            points = np.array(X[self.bins[idx]])
             distances = cdist(points, self.seeds[candidates[i]])
             candidates_idx = np.where(candidates[i])[0]
             closest_seed = np.argmin(distances, axis=1)
             for j, cs in enumerate(closest_seed):
                 self.seed_points[candidates_idx[cs]].append(points[j])
+                self.seed_point_indices[candidates_idx[cs]].append(self.bins[idx][j])
 
     def _compute_min_max_distances(self, max_coords, min_coords, non_empty_bins):
         max_distances = self._compute_max_distances(
@@ -198,7 +213,8 @@ class QBCA:
     def _recompute_cluster_centers(self):
         self.old_seeds = self.seeds.copy()
         for idx, _ in enumerate(self.seed_points):
-            self.seeds[idx] = self._compute_center(self.seed_points[idx])
+            if self.seed_points[idx]:
+                self.seeds[idx] = self._compute_center(self.seed_points[idx])
 
     def _compute_termination_criteria(self):
         phi = ((self.old_seeds - self.seeds) ** 2).sum(axis=1)
@@ -206,11 +222,8 @@ class QBCA:
 
     def _build_output_prediction(self, X):
         out = np.zeros_like(X)
-        y = np.zeros(X.shape[0], dtype=int)
-        processed = 0
-        for seed, points in enumerate(self.seed_points):
+        y = np.full(X.shape[0], fill_value=-1, dtype=int)
+        for seed, points in enumerate(self.seed_point_indices):
             if points:
-                out[processed: processed + len(points), :] = points
-                y[processed: processed + len(points)] = seed
-                processed += len(points)
-        return out, y
+                y[points] = seed
+        return X, y

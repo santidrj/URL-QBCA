@@ -10,7 +10,7 @@ file = "test.csv"
 data, gs = read_datafile(file)
 
 if __name__ == "__main__":
-    x, y = QBCA(4).fit_predict(data)
+    x, y = QBCA(4).fit_predict(data.copy())
     if data.shape[1] > 2:
         p = PCA(n_components=2)
         data = p.fit_transform(data)
