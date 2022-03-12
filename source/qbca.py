@@ -37,11 +37,11 @@ class QBCA:
     def _initialize_bins(self, X):
         self.m_dims = X.shape[-1]
         self.min_values = np.min(X, axis=0)
-        self.n_bins = math.floor(math.log(X.shape[0], self.m_dims))
-        self.bin_size = (np.max(X, axis=0) - np.min(X, axis=0)) / self.n_bins
-        self.bin_counts = np.zeros(self.n_bins ** self.m_dims, dtype=int)
-        self.bins = [[] for _ in range(self.n_bins ** self.m_dims)]
-        self.hist_shape = tuple([self.n_bins] * self.m_dims)
+        self.bins_per_dim = math.floor(math.log(X.shape[0], self.m_dims))
+        self.bin_size = (np.max(X, axis=0) - np.min(X, axis=0)) / self.bins_per_dim
+        self.bins_cardinality = np.zeros(self.bins_per_dim ** self.m_dims, dtype=int)
+        self.bins = [[] for _ in range(self.bins_per_dim ** self.m_dims)]
+        self.hist_shape = tuple([self.bins_per_dim] * self.m_dims)
 
         # Create a mask for all the possible positions of the neighbors wrt a point
         aux_list = list(product([-1, 0, 1], repeat=self.m_dims))
@@ -54,15 +54,17 @@ class QBCA:
         epsilon[mask] = 1
         epsilon[~mask] = point[~mask] - self.min_values[~mask]
         epsilon = np.ceil(epsilon / self.bin_size)
-        p = np.full_like(epsilon, self.bin_size)
+        p = np.full_like(epsilon, self.bins_per_dim)
         exp = np.arange(self.m_dims - 1, -1, -1)
-        return np.sum((epsilon - 1) * (p ** exp) + epsilon[-1]).astype(int)
+        # TODO: check this
+        # return np.sum((epsilon - 1) * (p ** exp) + epsilon[-1]).astype(int)
+        return np.sum((epsilon - 1) * (p ** exp)).astype(int)
 
-    def _quantization(self, x):
-        self._initialize_bins(x)
-        idxs = np.apply_along_axis(self._quantize_point, axis=1, arr=x)
-        for idx, point in zip(idxs, x):
-            self.bin_counts[idx] += 1
+    def _quantization(self, X):
+        self._initialize_bins(X)
+        idxs = np.apply_along_axis(self._quantize_point, axis=1, arr=X)
+        for idx, point in zip(idxs, X):
+            self.bins_cardinality[idx] += 1
             self.bins[idx].append(point)
 
     def _cluster_center_initialization(self):
@@ -79,7 +81,7 @@ class QBCA:
             flag = True
             neighbors = self._get_neighbors(b[1])
 
-            if (self.bin_counts[neighbors] <= b[0]).all():
+            if (self.bins_cardinality[neighbors] <= b[0]).all():
                 seed_list.append(b)
 
         # If there are not enough seeds
@@ -99,8 +101,6 @@ class QBCA:
                 for (_, b_idx) in seed_list[: self.n_seeds]
             ]
         )
-        # for s_idx, (_, b_idx) in enumerate(seed_list[:self.n_seeds]):
-        #     self.seeds[s_idx] = self._compute_center(self.bins[b_idx])
 
     def _cluster_center_assignment(self):
         non_empty_bins, non_empty_bins_idx = self._get_non_empty_bins()
@@ -150,10 +150,11 @@ class QBCA:
     def _get_non_empty_bins(self):
         """
         Get the non-empty histogram bins.
+
         :return: A tuple with the bin cardinality and its index.
         """
-        non_zero_bins = np.where(self.bin_counts != 0)
-        return self.bin_counts[non_zero_bins], non_zero_bins[0]
+        non_zero_bins = np.where(self.bins_cardinality != 0)
+        return self.bins_cardinality[non_zero_bins], non_zero_bins[0]
 
     def _bin_cardinality(self, bin: tuple):
         return bin[0]
@@ -169,7 +170,7 @@ class QBCA:
         neighbors = self.neighbors_mask + coord
         # Remove coordinates that are out of the histogram
         neighbors = neighbors[~(neighbors < 0).any(1)]
-        neighbors = neighbors[~(neighbors >= self.n_bins).any(1)]
+        neighbors = neighbors[~(neighbors >= self.bins_per_dim).any(1)]
         neighbors_idx = []
         for n in neighbors:
             neighbors_idx.append(np.ravel_multi_index(n, self.hist_shape))
