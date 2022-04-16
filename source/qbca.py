@@ -9,8 +9,8 @@ from source.data_structures import MaxHeap
 
 
 class QBCA:
-    def __init__(self, n_seeds=2, threshold=0.001, max_iter=50):
-        self.n_seeds = n_seeds
+    def __init__(self, n_clusters=2, threshold=0.0001, max_iter=300):
+        self.n_seeds = n_clusters
         self.threshold = threshold
         self.max_iter = max_iter
 
@@ -209,4 +209,4 @@ class QBCA:
         for seed, points in enumerate(self.seed_point_indices):
             if points:
                 y[points] = seed
-        return X, y
+        return y
