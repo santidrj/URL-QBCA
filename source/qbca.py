@@ -42,8 +42,8 @@ class QBCA:
         self.min_values = np.min(X, axis=0)
         self.bins_per_dim = math.floor(math.log(X.shape[0], self.m_dims))
         self.bin_size = (np.max(X, axis=0) - np.min(X, axis=0)) / self.bins_per_dim
-        self.bins_cardinality = np.zeros(self.bins_per_dim ** self.m_dims, dtype=int)
-        self.bins = [[] for _ in range(self.bins_per_dim ** self.m_dims)]
+        self.bins_cardinality = np.zeros(self.bins_per_dim**self.m_dims, dtype=int)
+        self.bins = [[] for _ in range(self.bins_per_dim**self.m_dims)]
         self.hist_shape = tuple([self.bins_per_dim] * self.m_dims)
 
         # Create a mask for all the possible positions of the neighbors wrt a point
@@ -51,28 +51,16 @@ class QBCA:
         aux_list.remove(tuple(np.zeros(self.m_dims)))
         self.neighbors_mask = np.array(aux_list)
 
-    # TODO: uncomment
-    # def _quantize_point(self, point):
-    #     epsilon = point.copy()
-    #     mask = point == self.min_values
-    #     epsilon[mask] = 1
-    #     epsilon[~mask] = point[~mask] - self.min_values[~mask]
-    #     epsilon = np.ceil(epsilon / self.bin_size)
-    #     p = np.full_like(epsilon, self.bins_per_dim)
-    #     exp = np.arange(self.m_dims - 1, -1, -1)
-    #     # TODO: check this
-    #     # return np.sum((epsilon - 1) * (p ** exp) + epsilon[-1]).astype(int)
-    #     bin_idx = np.sum((epsilon - 1) * (p ** exp)).astype(int)
-    #     return bin_idx
-
     def _quantize_point(self, point):
+        epsilon = point.copy()
         mask = point == self.min_values
-        point[mask] = 1
-        point[~mask] = point[~mask] - self.min_values[~mask]
-        point = np.ceil(point / self.bin_size)
-        p = np.full_like(point, self.bins_per_dim)
+        epsilon[mask] = 1
+        epsilon[~mask] = point[~mask] - self.min_values[~mask]
+        epsilon = np.ceil(epsilon / self.bin_size)
         exp = np.arange(self.m_dims - 1, -1, -1)
-        bin_idx = np.sum((point - 1) * (p ** exp)).astype(int)
+        # TODO: check this
+        # bin_idx = np.sum((epsilon - 1) * (self.bins_per_dim ** exp) + epsilon[-1]).astype(int)
+        bin_idx = np.sum((epsilon - 1) * (self.bins_per_dim**exp)).astype(int)
         return bin_idx
 
     def _quantization(self, X):
@@ -103,33 +91,29 @@ class QBCA:
         if len(seed_list) < self.n_seeds:
             seed_list.extend(
                 [x for x in aux_heap if x not in seed_list][
-                : self.n_seeds - len(seed_list)
+                    : self.n_seeds - len(seed_list)
                 ]
             )
 
         seed_list.sort(key=self._bin_cardinality)
 
-        # self.seeds = np.zeros((self.n_seeds, self.m_dims))
         self.seeds = np.array(
             [
                 self._compute_center(X[self.bins[b_idx]])
-                for (_, b_idx) in seed_list[: self.n_seeds] if self.bins[b_idx]
+                for (_, b_idx) in seed_list[: self.n_seeds]
+                if self.bins[b_idx]
             ]
         )
 
     def _cluster_center_assignment(self, X):
-        non_empty_bins, non_empty_bins_idx = self._get_non_empty_bins()
+        _, non_empty_bins_idx = self._get_non_empty_bins()
         coordinates = np.array(
             np.unravel_index(non_empty_bins_idx, self.hist_shape)
         ).transpose()
-        min_coords = self.bin_size * coordinates
-        max_coords = self.bin_size * (coordinates + 1)
-        min_max_distances = self._compute_min_max_distances(
-            max_coords, min_coords, non_empty_bins
-        )
-        min_distances = self._compute_min_distances(
-            max_coords, min_coords, non_empty_bins
-        )
+        min_coords = self.min_values + self.bin_size * coordinates
+        max_coords = self.min_values + self.bin_size * (coordinates + 1)
+        min_max_distances = self._compute_min_max_distances(max_coords, min_coords)
+        min_distances = self._compute_min_distances(max_coords, min_coords)
 
         candidates = (min_distances.transpose() <= min_max_distances).transpose()
         self.seed_points = [[] for _ in range(len(self.seeds))]
@@ -143,15 +127,13 @@ class QBCA:
                 self.seed_points[candidates_idx[cs]].append(points[j])
                 self.seed_point_indices[candidates_idx[cs]].append(self.bins[idx][j])
 
-    def _compute_min_max_distances(self, max_coords, min_coords, non_empty_bins):
-        max_distances = self._compute_max_distances(
-            max_coords, min_coords, non_empty_bins
-        )
+    def _compute_min_max_distances(self, max_coords, min_coords):
+        max_distances = self._compute_max_distances(max_coords, min_coords)
         return np.min(max_distances, axis=1)
 
-    def _compute_max_distances(self, max_coords, min_coords, non_empty_bins):
+    def _compute_max_distances(self, max_coords, min_coords):
         threshold = (min_coords + max_coords) / 2
-        max_distances = np.zeros((len(non_empty_bins), len(self.seeds)))
+        max_distances = np.zeros((len(max_coords), len(self.seeds)))
         for i, t in enumerate(threshold):
             upsilon = np.zeros(self.seeds.shape)
             mask = self.seeds >= t
@@ -196,14 +178,14 @@ class QBCA:
     def _compute_center(self, cluster):
         return np.mean(np.array(cluster), axis=0)
 
-    def _compute_min_distances(self, max_coords, min_coords, non_empty_bins):
-        min_distances = np.zeros((len(non_empty_bins), len(self.seeds)))
-        for i, b in enumerate(non_empty_bins):
+    def _compute_min_distances(self, max_coords, min_coords):
+        min_distances = np.zeros((len(max_coords), len(self.seeds)))
+        for i, (mx, mn) in enumerate(zip(max_coords, min_coords)):
             lb = self.seeds.copy()
-            mask_1 = self.seeds < min_coords[i]
-            mask_2 = self.seeds > max_coords[i]
-            min_coord = np.tile(min_coords[i], (lb.shape[0], 1))
-            max_coord = np.tile(max_coords[i], (lb.shape[0], 1))
+            mask_1 = self.seeds < mn
+            mask_2 = self.seeds > mx
+            min_coord = np.tile(mn, (lb.shape[0], 1))
+            max_coord = np.tile(mx, (lb.shape[0], 1))
             lb[mask_1] = min_coord[mask_1]
             lb[mask_2] = max_coord[mask_2]
             min_distances[i] = np.array(
@@ -223,7 +205,6 @@ class QBCA:
         return phi.sum() / self.n_seeds
 
     def _build_output_prediction(self, X):
-        out = np.zeros_like(X)
         y = np.full(X.shape[0], fill_value=-1, dtype=int)
         for seed, points in enumerate(self.seed_point_indices):
             if points:

@@ -3,16 +3,17 @@ from sklearn import datasets
 from sklearn.decomposition import PCA
 
 from source.qbca import QBCA
+from source.utils import read_datafile
 
 plt.style.use("ggplot")
 
-file = "test.csv"
+# file = "test.csv"
 # data, gs = read_datafile(file)
 iris = datasets.load_iris()
 data, gs = iris.data, iris.target
 
 if __name__ == "__main__":
-    x, y = QBCA(3).fit_predict(data.copy())
+    x, y = QBCA(3, 0.0001, 50).fit_predict(data.copy())
     if data.shape[1] > 2:
         p = PCA(n_components=2)
         data = p.fit_transform(data)
