@@ -1,6 +1,7 @@
+import time
 from sklearn.cluster import KMeans, MiniBatchKMeans
 from sklearn.datasets import make_blobs
-from sklearn.metrics import adjusted_mutual_info_score, adjusted_rand_score, normalized_mutual_info_score
+from sklearn.metrics import adjusted_mutual_info_score, adjusted_rand_score, calinski_harabasz_score, davies_bouldin_score, fowlkes_mallows_score, normalized_mutual_info_score
 
 from source.qbca import QBCA
 
@@ -47,34 +48,43 @@ def test_gaussian(option = 0):
     if option == 0:
         print("Test Gaussian 5")
         data, gs = create_gaussian_5()
+        algorithms = initialize_algorithms(5, 1e-4, 300)
     elif option == 1:
         print("Test Gaussian 25")
         data, gs = create_gaussian_25()
+        algorithms = initialize_algorithms(25, 1e-4, 300)
     else:
         raise ValueError(f"There is no option {option}. Available options are [0, 1].")
 
-    algorithms = initialize_algorithms(5, 1e-4, 300)
-    scores = {}
+    metrics = {}
 
     for name, algorithm in algorithms.items():
-        if hasattr(algorithm, 'fit_predict'):
-            labels = algorithm.fit_predict(data)
-        else:
-            algorithm.fit(data)
-            labels = algorithm.predict(data)
+        start = time.perf_counter()
+        algorithm.fit(data)
+        end = round(time.perf_counter() - start, 4)
+        labels = algorithm.predict(data)
         
         ami = adjusted_mutual_info_score(gs, labels)
         ar = adjusted_rand_score(gs, labels)
-        nmi = normalized_mutual_info_score(gs, labels)
+        fowlkes = fowlkes_mallows_score(gs, labels)
+        calinski = calinski_harabasz_score(data, labels)
+        davies = davies_bouldin_score(data, labels)
         out_string = f"""{name}
-Adjusted Mutual Information: {ami}
-Adjusted Random Score: {ar}
-Normalized Mutual Information: {nmi}
+Training time: {end} seconds
+
+External validation:
+    Adjusted Mutual Information: {ami:.4f}
+    Adjusted Random Score: {ar:.4f}
+    Fowlkes-Mallows Score: {fowlkes:.4f}
+
+Internal validation:
+    Calinski-Harabasz Index: {calinski:.4f}
+    Davies-Bouldin Index: {davies:.4f}
 """
         print(out_string)
-        scores[name] = [ami,ar,nmi]
+        metrics[name] = {'time': end, 'external': [ami,ar,fowlkes], 'internal': [calinski, davies]}
     
-    return scores
+    return metrics
 
 test_gaussian(0)
 test_gaussian(1)
