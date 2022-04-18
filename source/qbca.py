@@ -13,6 +13,7 @@ class QBCA:
         self.n_seeds = n_clusters
         self.threshold = threshold
         self.max_iter = max_iter
+        self.n_dist_ = 0
 
     def fit(self, X):
         x = X.copy()
@@ -29,7 +30,6 @@ class QBCA:
         return self
 
     def predict(self, X):
-        # TODO: finish method
         x = X.copy()
         return self._build_output_prediction(x)
 
@@ -58,8 +58,6 @@ class QBCA:
         epsilon[~mask] = point[~mask] - self.min_values[~mask]
         epsilon = np.ceil(epsilon / self.bin_size)
         exp = np.arange(self.m_dims - 1, -1, -1)
-        # TODO: check this
-        # bin_idx = np.sum((epsilon - 1) * (self.bins_per_dim ** exp) + epsilon[-1]).astype(int)
         bin_idx = np.sum((epsilon - 1) * (self.bins_per_dim**exp)).astype(int)
         return bin_idx
 
@@ -144,7 +142,27 @@ class QBCA:
             max_distances[i] = np.array(
                 [euclidean(s, u) for s, u in zip(self.seeds, upsilon)]
             )
+        self.n_dist_ += max_distances.size
         return max_distances
+    
+
+    def _compute_min_distances(self, max_coords, min_coords):
+        min_distances = np.zeros((len(max_coords), len(self.seeds)))
+        for i, (mx, mn) in enumerate(zip(max_coords, min_coords)):
+            lb = self.seeds.copy()
+            mask_1 = self.seeds < mn
+            mask_2 = self.seeds > mx
+            min_coord = np.tile(mn, (lb.shape[0], 1))
+            max_coord = np.tile(mx, (lb.shape[0], 1))
+            lb[mask_1] = min_coord[mask_1]
+            lb[mask_2] = max_coord[mask_2]
+            min_distances[i] = np.array(
+                [euclidean(s, u) for s, u in zip(self.seeds, lb)]
+            )
+
+        self.n_dist_ += min_distances.size
+        return min_distances
+
 
     def _get_non_empty_bins(self):
         """
@@ -177,22 +195,6 @@ class QBCA:
 
     def _compute_center(self, cluster):
         return np.mean(np.array(cluster), axis=0)
-
-    def _compute_min_distances(self, max_coords, min_coords):
-        min_distances = np.zeros((len(max_coords), len(self.seeds)))
-        for i, (mx, mn) in enumerate(zip(max_coords, min_coords)):
-            lb = self.seeds.copy()
-            mask_1 = self.seeds < mn
-            mask_2 = self.seeds > mx
-            min_coord = np.tile(mn, (lb.shape[0], 1))
-            max_coord = np.tile(mx, (lb.shape[0], 1))
-            lb[mask_1] = min_coord[mask_1]
-            lb[mask_2] = max_coord[mask_2]
-            min_distances[i] = np.array(
-                [euclidean(s, u) for s, u in zip(self.seeds, lb)]
-            )
-
-        return min_distances
 
     def _recompute_cluster_centers(self):
         self.old_seeds = self.seeds.copy()
