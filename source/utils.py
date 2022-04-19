@@ -1,6 +1,6 @@
 import os.path
-import numpy as np
 
+import numpy as np
 import pandas as pd
 from scipy.spatial.distance import cdist
 
@@ -21,11 +21,13 @@ def clusters_dissimilarity(c1, c2):
 
 def cluster_diameter(cluster):
     """Compute the diameter of a cluster"""
-    return np.max(cdist(cluster,cluster))
+    return np.max(cdist(cluster, cluster))
 
 
-def dunn_index(clusters):
+def dunn_index(X, labels):
     """Compue dunn index from cluster datapoints"""
+    clusters = [X[labels == i, :] for i in np.unique(labels)]
+
     min_ratio = None
     max_diameter = np.max([cluster_diameter(c) for c in clusters])
     k = len(clusters)

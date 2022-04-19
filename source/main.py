@@ -1,10 +1,9 @@
 import matplotlib.pyplot as plt
-import numpy as np
 from sklearn import datasets
 from sklearn.decomposition import PCA
 
 from source.qbca import QBCA
-from source.utils import dunn_index, read_datafile
+from source.utils import dunn_index
 
 plt.style.use("ggplot")
 
@@ -16,7 +15,7 @@ data, gs = iris.data, iris.target
 if __name__ == "__main__":
     qbca = QBCA(3, 1e-4)
     y = qbca.fit_predict(data)
-    dunn = dunn_index([data[y == i,:] for i in np.unique(y)])
+    dunn = dunn_index(data, y)
     print(dunn)
     print(qbca.n_dist_)
     if data.shape[1] > 2:

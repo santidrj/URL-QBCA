@@ -31,7 +31,11 @@ class QBCA:
 
     def predict(self, X):
         x = X.copy()
-        return self._build_output_prediction(x)
+        y = np.full(X.shape[0], fill_value=-1, dtype=int)
+        for seed, points in enumerate(self.seed_point_indices):
+            if points:
+                y[points] = seed
+        return y
 
     def fit_predict(self, X):
         self.fit(X)
@@ -205,10 +209,3 @@ class QBCA:
     def _compute_termination_criteria(self):
         phi = ((self.old_seeds - self.seeds) ** 2).sum(axis=1)
         return phi.sum() / self.n_seeds
-
-    def _build_output_prediction(self, X):
-        y = np.full(X.shape[0], fill_value=-1, dtype=int)
-        for seed, points in enumerate(self.seed_point_indices):
-            if points:
-                y[points] = seed
-        return y

@@ -1,5 +1,9 @@
+import os
 import time
+
+import numpy as np
 import pandas as pd
+from matplotlib import pyplot as plt
 from sklearn.cluster import KMeans, MiniBatchKMeans
 from sklearn.datasets import make_blobs
 from sklearn.metrics import (
@@ -11,10 +15,14 @@ from sklearn.metrics import (
 )
 
 from source.qbca import QBCA
-
+from source.utils import dunn_index
 
 N_SAMPLES = 10000
 SEED = 2022
+
+fig_dir = "../figures"
+if not os.path.exists(fig_dir):
+    os.mkdir(fig_dir)
 
 
 def create_gaussian_5():
@@ -51,23 +59,44 @@ def initialize_algorithms(k, threshold, max_iter):
     }
 
 
-def test_gaussian(algorithms, option=0):
-    if option == 0:
-        print("Test Gaussian 5")
-        data, gs = create_gaussian_5()
-    elif option == 1:
-        print("Test Gaussian 25")
-        data, gs = create_gaussian_25()
-    else:
-        raise ValueError(f"There is no option {option}. Available options are [0, 1].")
+def save_metrics(out_file, metrics):
+    performance_metrics = [
+        "Training time",
+        "#Distance computations"
+    ]
 
-    metrics = run_test(algorithms, data, gs)
+    external_metrics = [
+        "Adjusted Mutual Information",
+        # "Adjusted Random Score",
+        "Fowlkes-Mallows Score"
+    ]
 
-    metrics.style.to_latex()
-    return metrics
+    internal_metrics = [
+        "Calinski-Harabasz Index",
+        # "Davies-Bouldin Index",
+        "Dunn Index"
+    ]
+
+    out_dir = "../out"
+
+    if not os.path.exists(out_dir):
+        os.mkdir(out_dir)
+
+    out_file = os.path.join(out_dir, out_file)
+    s = metrics[performance_metrics].style
+    s.format('{:.4f}')
+    s.to_latex(f"{out_file}_performance.tex", position='htbp', position_float='centering', hrules=True)
+
+    s = metrics[external_metrics].style.highlight_max(props='textbf: --rwrap', axis=1)
+    s.format('{:.4f}')
+    s.to_latex(f"{out_file}_external_metrics.tex", position='htbp', position_float='centering', hrules=True)
+
+    s = metrics[internal_metrics].style.highlight_max(props='textbf: --rwrap', axis=1)
+    s.format('{:.4f}')
+    s.to_latex(f"{out_file}_internal_metrics.tex", position='htbp', position_float='centering', hrules=True)
 
 
-def run_test(algorithms, data, gs, n_iter=10):
+def run_test(fig_name, algorithms, data, gs, n_iter=10, verbose=False):
     metrics = {}
 
     df = pd.DataFrame(
@@ -78,16 +107,22 @@ def run_test(algorithms, data, gs, n_iter=10):
             "Adjusted Random Score",
             "Fowlkes-Mallows Score",
             "Calinski-Harabasz Index",
-            "Davies-Bouldin Index"
+            "Davies-Bouldin Index",
+            "Dunn Index"
         ]
     )
-    for name, algorithm in algorithms.items():
+
+    fig, ax = plt.subplots(2, 2)
+
+    for i, (name, algorithm) in enumerate(algorithms.items()):
+        print(f'Start running {name}')
         avg_time = 0
         avg_ami = 0
         avg_ar = 0
         avg_fowlkes = 0
         avg_calinski = 0
         avg_davies = 0
+        avg_dunn = 0
         avg_dist_count = 0
         for _ in range(n_iter):
             start = time.perf_counter()
@@ -100,11 +135,16 @@ def run_test(algorithms, data, gs, n_iter=10):
             avg_fowlkes += fowlkes_mallows_score(gs, labels)
             avg_calinski += calinski_harabasz_score(data, labels)
             avg_davies += davies_bouldin_score(data, labels)
+            avg_dunn += dunn_index(data, labels)
 
             if hasattr(algorithm, "n_dist_"):
                 avg_dist_count += algorithm.n_dist_
             else:
                 avg_dist_count += algorithm.n_iter_ * data.shape[0]
+
+        idx = np.unravel_index(i, (2, 2))
+        ax[idx].scatter(data[:, 0], data[:, 1], c=labels)
+        ax[idx].set_title(f'After {name}')
 
         avg_time /= n_iter
         avg_ami /= n_iter
@@ -112,9 +152,11 @@ def run_test(algorithms, data, gs, n_iter=10):
         avg_fowlkes /= n_iter
         avg_calinski /= n_iter
         avg_davies /= n_iter
+        avg_dunn /= n_iter
         avg_dist_count /= n_iter
 
-        out_string = f"""{name}
+        if verbose:
+            out_string = f"""{name}
 Training time: {avg_time:.4f} seconds
 
 Number of distance computations: {avg_dist_count}
@@ -126,31 +168,32 @@ External validation:
 Internal validation:
     Calinski-Harabasz Index: {avg_calinski:.4f}
     Davies-Bouldin Index: {avg_davies:.4f}
-"""
-        print(out_string)
+    Dunn Index: {avg_dunn:.4f}
+    """
+            print(out_string)
+
         aux_df = pd.DataFrame(
-                [[
-                    avg_time,
-                    avg_dist_count,
-                    avg_ami,
-                    avg_ar,
-                    avg_fowlkes,
-                    avg_calinski,
-                    avg_davies,
-                ]],
-                columns=df.columns,
-                index=[name]
-            )
-        df = pd.concat([df,aux_df])
-        metrics[name] = {
-            "time": avg_time,
-            "dist_count": avg_dist_count,
-            "external": [avg_ami, avg_ar, avg_fowlkes],
-            "internal": [avg_calinski, avg_davies],
-        }
+            [[
+                avg_time,
+                avg_dist_count,
+                avg_ami,
+                avg_ar,
+                avg_fowlkes,
+                avg_calinski,
+                avg_davies,
+                avg_dunn
+            ]],
+            columns=df.columns,
+            index=[name]
+        )
+        df = pd.concat([df, aux_df])
+        # metrics[name] = {
+        #     "time": avg_time,
+        #     "dist_count": avg_dist_count,
+        #     "external": [avg_ami, avg_ar, avg_fowlkes],
+        #     "internal": [avg_calinski, avg_davies],
+        # }
+
+    fig.savefig(os.path.join(fig_dir, f"{fig_name}.png"))
+
     return df
-
-
-test_gaussian(initialize_algorithms(5, 1e-4, 300), 0)
-
-test_gaussian(initialize_algorithms(25, 1e-4, 300), 1)
