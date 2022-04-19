@@ -39,12 +39,12 @@ def test_image(algorithms, out_file, verbose=False):
     metrics = run_segmentation(out_file, algorithms, data, im, verbose=verbose)
 
 
-# test_gaussian(initialize_algorithms(5, 1e-4, 30), "gaussian_5", option=0, verbose=True)
+test_gaussian(initialize_algorithms(5, 1e-4, 30), "gaussian_5", option=0, verbose=True)
 
-# test_gaussian(initialize_algorithms(25, 1e-4, 30), "gaussian_25", option=1, verbose=True)
+test_gaussian(initialize_algorithms(25, 1e-4, 30), "gaussian_25", option=1, verbose=True)
 
-# test_wine(initialize_algorithms(3, 1e-4, 30), "wine", verbose=True)
+test_wine(initialize_algorithms(3, 1e-4, 30), "wine", verbose=True)
 
-# test_iris(initialize_algorithms(3, 1e-4, 30), "iris", verbose=True)
+test_iris(initialize_algorithms(3, 1e-4, 30), "iris", verbose=True)
 
 test_image(initialize_algorithms(5, 1e-2, 50), "butterfly")

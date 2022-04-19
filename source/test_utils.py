@@ -28,7 +28,7 @@ fig_dir = "figures"
 if not os.path.exists(fig_dir):
     os.mkdir(fig_dir)
 
-out_dir = "out"
+out_dir = "results"
 if not os.path.exists(out_dir):
     os.mkdir(out_dir)
 
@@ -65,7 +65,7 @@ def load_image(filename, height=150):
 def initialize_algorithms(k, threshold, max_iter):
     qbca = QBCA(n_clusters=k, threshold=threshold, max_iter=max_iter)
     kmeans = KMeans(
-        n_clusters=k, init="random", max_iter=max_iter, tol=threshold, algorithm="full"
+        n_clusters=k, init="random", max_iter=max_iter, tol=threshold, algorithm="full", n_init=1
     )
     kmeans_plusplus = KMeans(
         n_clusters=k,
@@ -73,8 +73,9 @@ def initialize_algorithms(k, threshold, max_iter):
         max_iter=max_iter,
         tol=threshold,
         algorithm="full",
+        n_init=1
     )
-    minibatch_kmeans = MiniBatchKMeans(n_clusters=k, max_iter=max_iter)
+    minibatch_kmeans = MiniBatchKMeans(n_clusters=k, max_iter=max_iter, n_init = 1)
 
     return {
         "qbca": qbca,
@@ -107,11 +108,11 @@ def save_metrics(out_file, metrics):
     s.format('{:.4f}')
     s.to_latex(f"{out_file}_performance.tex", position='htbp', position_float='centering', hrules=True)
 
-    s = metrics[external_metrics].style.highlight_max(props='textbf: --rwrap', axis=1)
+    s = metrics[external_metrics].style.highlight_max(props='textbf: --rwrap', axis=0)
     s.format('{:.4f}')
     s.to_latex(f"{out_file}_external_metrics.tex", position='htbp', position_float='centering', hrules=True)
 
-    s = metrics[internal_metrics].style.highlight_max(props='textbf: --rwrap', axis=1)
+    s = metrics[internal_metrics].style.highlight_max(props='textbf: --rwrap', axis=0)
     s.format('{:.4f}')
     s.to_latex(f"{out_file}_internal_metrics.tex", position='htbp', position_float='centering', hrules=True)
 
@@ -134,6 +135,7 @@ def run_test(fig_name, algorithms, data, gs, n_iter=10, verbose=False):
 
     for i, (name, algorithm) in enumerate(algorithms.items()):
         print(f'Start running {name}')
+        alg = algorithm
         avg_time = 0
         avg_ami = 0
         avg_ar = 0
@@ -144,9 +146,9 @@ def run_test(fig_name, algorithms, data, gs, n_iter=10, verbose=False):
         avg_dist_count = 0
         for _ in range(n_iter):
             start = time.perf_counter()
-            algorithm.fit(data)
+            alg.fit(data)
             avg_time += time.perf_counter() - start
-            labels = algorithm.predict(data)
+            labels = alg.predict(data)
 
             avg_ami += adjusted_mutual_info_score(gs, labels)
             avg_ar += adjusted_rand_score(gs, labels)
@@ -156,16 +158,16 @@ def run_test(fig_name, algorithms, data, gs, n_iter=10, verbose=False):
             avg_dunn += dunn_index(data, labels)
 
             if hasattr(algorithm, "n_dist_"):
-                avg_dist_count += algorithm.n_dist_
+                avg_dist_count += alg.n_dist_
             else:
-                avg_dist_count += algorithm.n_iter_ * data.shape[0]
+                avg_dist_count += alg.n_iter_ * data.shape[0] * algorithm.n_clusters
 
         # Plot
         if data.shape[1] > 2:
             p = PCA(n_components=2)
             data = p.fit_transform(data)
         idx = np.unravel_index(i, (2, 2))
-        ax[idx].scatter(data[:, 0], data[:, 1], s=1, c=labels)
+        ax[idx].scatter(data[:, 0], data[:, 1], s=20, c=labels)
         ax[idx].set_title(f'After {name}')
 
         avg_time /= n_iter
@@ -236,24 +238,25 @@ def run_segmentation(fig_name, algorithms, data, image, verbose=False):
 
     for i, (name, algorithm) in enumerate(algorithms.items()):
         print(f'Start running {name}')
+        alg = algorithm
         start = time.perf_counter()
-        algorithm.fit(data)
+        alg.fit(data)
         seconds = time.perf_counter() - start
-        labels = algorithm.predict(data)
+        labels = alg.predict(data)
 
         calinski = calinski_harabasz_score(data, labels)
         dunn = dunn_index(data, labels)
 
         if hasattr(algorithm, "n_dist_"):
-            dist_count = algorithm.n_dist_
+            dist_count = alg.n_dist_
         else:
-            dist_count = algorithm.n_iter_ * data.shape[0]
+            dist_count = alg.n_iter_ * data.shape[0]
 
         # Plot
         if hasattr(algorithm, "seeds"):
-            centers = algorithm.seeds
+            centers = alg.seeds
         else:
-            centers = algorithm.cluster_centers_
+            centers = alg.cluster_centers_
 
         centers = np.uint8(centers)
         segmented_image = centers[labels.flatten()]

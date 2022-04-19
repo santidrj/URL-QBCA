@@ -13,6 +13,9 @@ class QBCA:
         self.n_seeds = n_clusters
         self.threshold = threshold
         self.max_iter = max_iter
+        self.seeds = []
+        self.seed_points = []
+        self.seed_point_indices = []
         self.n_dist_ = 0
 
     def fit(self, X):
@@ -49,6 +52,7 @@ class QBCA:
         self.bins_cardinality = np.zeros(self.bins_per_dim**self.m_dims, dtype=int)
         self.bins = [[] for _ in range(self.bins_per_dim**self.m_dims)]
         self.hist_shape = tuple([self.bins_per_dim] * self.m_dims)
+        self.n_dist_ = 0
 
         # Create a mask for all the possible positions of the neighbors wrt a point
         aux_list = list(product([-1, 0, 1], repeat=self.m_dims))
@@ -122,12 +126,18 @@ class QBCA:
         self.seed_point_indices = [[] for _ in range(len(self.seeds))]
         for i, idx in enumerate(non_empty_bins_idx):
             points = np.array(X[self.bins[idx]])
-            distances = cdist(points, self.seeds[candidates[i]])
             candidates_idx = np.where(candidates[i])[0]
-            closest_seed = np.argmin(distances, axis=1)
-            for j, cs in enumerate(closest_seed):
-                self.seed_points[candidates_idx[cs]].append(points[j])
-                self.seed_point_indices[candidates_idx[cs]].append(self.bins[idx][j])
+            if len(candidates_idx) > 1:
+                distances = cdist(points, self.seeds[candidates[i]])
+                self.n_dist_ += distances.size
+                closest_seed = np.argmin(distances, axis=1)
+                for j, cs in enumerate(closest_seed):
+                    self.seed_points[candidates_idx[cs]].append(points[j])
+                    self.seed_point_indices[candidates_idx[cs]].append(self.bins[idx][j])
+            else:
+                self.seed_points[candidates_idx[0]] = [*self.seed_points[candidates_idx[0]],*points]
+                self.seed_point_indices[candidates_idx[0]] = [*self.seed_point_indices[candidates_idx[0]], *self.bins[idx]]
+
 
     def _compute_min_max_distances(self, max_coords, min_coords):
         max_distances = self._compute_max_distances(max_coords, min_coords)
