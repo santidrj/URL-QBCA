@@ -46,8 +46,8 @@ def create_gaussian_25():
 
 
 def load_image(filename, height=150):
-    data_dir = 'data'
-    image = cv2.imread(os.path.join(data_dir, filename + '.jpg'))
+    data_dir = "data"
+    image = cv2.imread(os.path.join(data_dir, filename + ".jpg"))
     image = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
     if height:
         y, x, z = image.shape
@@ -65,7 +65,12 @@ def load_image(filename, height=150):
 def initialize_algorithms(k, threshold, max_iter):
     qbca = QBCA(n_clusters=k, threshold=threshold, max_iter=max_iter)
     kmeans = KMeans(
-        n_clusters=k, init="random", max_iter=max_iter, tol=threshold, algorithm="full", n_init=1
+        n_clusters=k,
+        init="random",
+        max_iter=max_iter,
+        tol=threshold,
+        algorithm="full",
+        n_init=1,
     )
     kmeans_plusplus = KMeans(
         n_clusters=k,
@@ -73,9 +78,9 @@ def initialize_algorithms(k, threshold, max_iter):
         max_iter=max_iter,
         tol=threshold,
         algorithm="full",
-        n_init=1
+        n_init=1,
     )
-    minibatch_kmeans = MiniBatchKMeans(n_clusters=k, max_iter=max_iter, n_init = 1)
+    minibatch_kmeans = MiniBatchKMeans(n_clusters=k, max_iter=max_iter, n_init=1)
 
     return {
         "qbca": qbca,
@@ -86,35 +91,50 @@ def initialize_algorithms(k, threshold, max_iter):
 
 
 def save_metrics(out_file, metrics):
-    performance_metrics = [
-        "Training time",
-        "#Distance computations"
-    ]
+    performance_metrics = ["Training time", "#Distance computations"]
 
     external_metrics = [
         "Adjusted Mutual Information",
         # "Adjusted Random Score",
-        "Fowlkes-Mallows Score"
+        "Fowlkes-Mallows Score",
     ]
 
     internal_metrics = [
         "Calinski-Harabasz Index",
         # "Davies-Bouldin Index",
-        "Dunn Index"
+        "Dunn Index",
     ]
 
-    out_file = os.path.join(out_dir, out_file)
-    s = metrics[performance_metrics].style
-    s.format('{:.4f}')
-    s.to_latex(f"{out_file}_performance.tex", position='htbp', position_float='centering', hrules=True)
+    tex_out = os.path.join(out_dir, out_file)
+    s = metrics[performance_metrics].style.highlight_min(
+        props="textbf: --rwrap", axis=0
+    )
+    s.format("{:.4f}")
+    s.to_latex(
+        f"{tex_out}_performance.tex",
+        position="htbp",
+        position_float="centering",
+        hrules=True,
+    )
 
-    s = metrics[external_metrics].style.highlight_max(props='textbf: --rwrap', axis=0)
-    s.format('{:.4f}')
-    s.to_latex(f"{out_file}_external_metrics.tex", position='htbp', position_float='centering', hrules=True)
+    if ((external_metrics in list(metrics.columns))):
+        s = metrics[external_metrics].style.highlight_max(props="textbf: --rwrap", axis=0)
+        s.format("{:.4f}")
+        s.to_latex(
+            f"{tex_out}_external_metrics.tex",
+            position="htbp",
+            position_float="centering",
+            hrules=True,
+        )
 
-    s = metrics[internal_metrics].style.highlight_max(props='textbf: --rwrap', axis=0)
-    s.format('{:.4f}')
-    s.to_latex(f"{out_file}_internal_metrics.tex", position='htbp', position_float='centering', hrules=True)
+    s = metrics[internal_metrics].style.highlight_max(props="textbf: --rwrap", axis=0)
+    s.format("{:.4f}")
+    s.to_latex(
+        f"{tex_out}_internal_metrics.tex",
+        position="htbp",
+        position_float="centering",
+        hrules=True,
+    )
 
 
 def run_test(fig_name, algorithms, data, gs, n_iter=10, verbose=False):
@@ -127,14 +147,14 @@ def run_test(fig_name, algorithms, data, gs, n_iter=10, verbose=False):
             "Fowlkes-Mallows Score",
             "Calinski-Harabasz Index",
             "Davies-Bouldin Index",
-            "Dunn Index"
+            "Dunn Index",
         ]
     )
 
     fig, ax = plt.subplots(2, 2)
 
     for i, (name, algorithm) in enumerate(algorithms.items()):
-        print(f'Start running {name}')
+        print(f"Start running {name}")
         alg = algorithm
         avg_time = 0
         avg_ami = 0
@@ -144,6 +164,8 @@ def run_test(fig_name, algorithms, data, gs, n_iter=10, verbose=False):
         avg_davies = 0
         avg_dunn = 0
         avg_dist_count = 0
+        best_dunn = np.NINF
+        best_clustering = []
         for _ in range(n_iter):
             start = time.perf_counter()
             alg.fit(data)
@@ -155,20 +177,25 @@ def run_test(fig_name, algorithms, data, gs, n_iter=10, verbose=False):
             avg_fowlkes += fowlkes_mallows_score(gs, labels)
             avg_calinski += calinski_harabasz_score(data, labels)
             avg_davies += davies_bouldin_score(data, labels)
-            avg_dunn += dunn_index(data, labels)
+            dunn = dunn_index(data, labels)
+            avg_dunn += dunn
+
+            if dunn > best_dunn:
+                best_dunn = dunn
+                best_clustering = labels
 
             if hasattr(algorithm, "n_dist_"):
                 avg_dist_count += alg.n_dist_
             else:
-                avg_dist_count += alg.n_iter_ * data.shape[0] * algorithm.n_clusters
+                avg_dist_count += alg.n_iter_ * len(data) * algorithm.n_clusters
 
         # Plot
         if data.shape[1] > 2:
             p = PCA(n_components=2)
             data = p.fit_transform(data)
         idx = np.unravel_index(i, (2, 2))
-        ax[idx].scatter(data[:, 0], data[:, 1], s=20, c=labels)
-        ax[idx].set_title(f'After {name}')
+        ax[idx].scatter(data[:, 0], data[:, 1], s=20, c=best_clustering)
+        ax[idx].set_title(f"After {name}")
 
         avg_time /= n_iter
         avg_ami /= n_iter
@@ -197,29 +224,26 @@ Internal validation:
             print(out_string)
 
         aux_df = pd.DataFrame(
-            [[
-                avg_time,
-                avg_dist_count,
-                avg_ami,
-                avg_ar,
-                avg_fowlkes,
-                avg_calinski,
-                avg_davies,
-                avg_dunn
-            ]],
+            [
+                [
+                    avg_time,
+                    avg_dist_count,
+                    avg_ami,
+                    avg_ar,
+                    avg_fowlkes,
+                    avg_calinski,
+                    avg_davies,
+                    avg_dunn,
+                ]
+            ],
             columns=df.columns,
-            index=[name]
+            index=[name],
         )
         df = pd.concat([df, aux_df])
-        # metrics[name] = {
-        #     "time": avg_time,
-        #     "dist_count": avg_dist_count,
-        #     "external": [avg_ami, avg_ar, avg_fowlkes],
-        #     "internal": [avg_calinski, avg_davies],
-        # }
 
     fig.tight_layout()
     fig.savefig(os.path.join(fig_dir, f"{fig_name}.png"))
+    plt.close(fig)
 
     return df
 
@@ -230,14 +254,14 @@ def run_segmentation(fig_name, algorithms, data, image, verbose=False):
             "Training time",
             "#Distance computations",
             "Calinski-Harabasz Index",
-            "Dunn Index"
+            "Dunn Index",
         ]
     )
 
     fig, ax = plt.subplots(2, 2)
 
     for i, (name, algorithm) in enumerate(algorithms.items()):
-        print(f'Start running {name}')
+        print(f"Start running {name}")
         alg = algorithm
         start = time.perf_counter()
         alg.fit(data)
@@ -262,7 +286,6 @@ def run_segmentation(fig_name, algorithms, data, image, verbose=False):
         segmented_image = centers[labels.flatten()]
         segmented_image = segmented_image.reshape(image.shape)
 
-        im = data.copy()
         idx = np.unravel_index(i, (2, 2))
         ax[idx].grid(False)
         ax[idx].imshow(segmented_image)
@@ -281,22 +304,9 @@ def run_segmentation(fig_name, algorithms, data, image, verbose=False):
             print(out_string)
 
         aux_df = pd.DataFrame(
-            [[
-                seconds,
-                dist_count,
-                calinski,
-                dunn
-            ]],
-            columns=df.columns,
-            index=[name]
+            [[seconds, dist_count, calinski, dunn]], columns=df.columns, index=[name]
         )
         df = pd.concat([df, aux_df])
-        # metrics[name] = {
-        #     "time": avg_time,
-        #     "dist_count": avg_dist_count,
-        #     "external": [avg_ami, avg_ar, avg_fowlkes],
-        #     "internal": [avg_calinski, avg_davies],
-        # }
 
     fig.tight_layout()
     fig.savefig(os.path.join(fig_dir, f"{fig_name}.png"))
