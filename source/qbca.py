@@ -60,13 +60,13 @@ class QBCA:
         self.neighbors_mask = np.array(aux_list)
 
     def _quantize_point(self, point):
-        epsilon = point.copy()
+        xi = point.copy()
         mask = point == self.min_values
-        epsilon[mask] = 1
-        epsilon[~mask] = point[~mask] - self.min_values[~mask]
-        epsilon = np.ceil(epsilon / self.bin_size)
+        xi[mask] = 1
+        xi[~mask] = point[~mask] - self.min_values[~mask]
+        xi = np.ceil(xi / self.bin_size)
         exp = np.arange(self.m_dims - 1, -1, -1)
-        bin_idx = np.sum((epsilon - 1) * (self.bins_per_dim**exp)).astype(int)
+        bin_idx = np.sum((xi - 1) * (self.bins_per_dim**exp)).astype(int)
         return bin_idx
 
     def _quantization(self, X):
