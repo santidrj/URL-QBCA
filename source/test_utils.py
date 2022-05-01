@@ -48,22 +48,20 @@ def create_gaussian_25():
 def load_image(filename, height=150):
     data_dir = "data"
     image = cv2.imread(os.path.join(data_dir, filename + ".jpg"))
-    image = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
+    image = cv2.cvtColor(image, cv2.COLOR_BGR2Lab)
     if height:
         y, x, z = image.shape
         ratio = height / float(y)
         dim = (int(x * ratio), height)
         image = cv2.resize(image, dim, interpolation=cv2.INTER_CUBIC)
+    image = cv2.GaussianBlur(image, (5,5), 0.5)
     pixel_values = image.reshape((-1, 3))
-    # y, x, z = image.shape
-    # x_idx, y_idx = np.unravel_index(np.arange(x * y), image.shape[:2])
-    # im2d = image.reshape(x * y, z)
-    # im2d = np.hstack((im2d, x_idx.reshape(-1, 1), y_idx.reshape(-1, 1)))
     return np.float32(pixel_values), image
 
 
 def initialize_algorithms(k, threshold, max_iter):
     qbca = QBCA(n_clusters=k, threshold=threshold, max_iter=max_iter)
+    # Set n_init to 1 to run only once the algorithms
     kmeans = KMeans(
         n_clusters=k,
         init="random",
