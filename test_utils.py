@@ -50,11 +50,11 @@ def load_image(filename, height=150):
     image = cv2.imread(os.path.join(data_dir, filename + ".jpg"))
     image = cv2.cvtColor(image, cv2.COLOR_BGR2Lab)
     if height:
-        y, x, z = image.shape
+        y, x, _ = image.shape
         ratio = height / float(y)
         dim = (int(x * ratio), height)
         image = cv2.resize(image, dim, interpolation=cv2.INTER_CUBIC)
-    image = cv2.GaussianBlur(image, (5,5), 0.5)
+    image = cv2.GaussianBlur(image, (5, 5), 0.5)
     pixel_values = image.reshape((-1, 3))
     return np.float32(pixel_values), image
 
@@ -115,8 +115,10 @@ def save_metrics(out_file, metrics):
         hrules=True,
     )
 
-    if ((external_metrics in list(metrics.columns))):
-        s = metrics[external_metrics].style.highlight_max(props="textbf: --rwrap", axis=0)
+    if external_metrics in list(metrics.columns):
+        s = metrics[external_metrics].style.highlight_max(
+            props="textbf: --rwrap", axis=0
+        )
         s.format("{:.4f}")
         s.to_latex(
             f"{tex_out}_external_metrics.tex",

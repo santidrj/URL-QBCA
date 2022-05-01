@@ -133,11 +133,18 @@ class QBCA:
                 closest_seed = np.argmin(distances, axis=1)
                 for j, cs in enumerate(closest_seed):
                     self.seed_points[candidates_idx[cs]].append(points[j])
-                    self.seed_point_indices[candidates_idx[cs]].append(self.bins[idx][j])
+                    self.seed_point_indices[candidates_idx[cs]].append(
+                        self.bins[idx][j]
+                    )
             else:
-                self.seed_points[candidates_idx[0]] = [*self.seed_points[candidates_idx[0]],*points]
-                self.seed_point_indices[candidates_idx[0]] = [*self.seed_point_indices[candidates_idx[0]], *self.bins[idx]]
-
+                self.seed_points[candidates_idx[0]] = [
+                    *self.seed_points[candidates_idx[0]],
+                    *points,
+                ]
+                self.seed_point_indices[candidates_idx[0]] = [
+                    *self.seed_point_indices[candidates_idx[0]],
+                    *self.bins[idx],
+                ]
 
     def _compute_min_max_distances(self, max_coords, min_coords):
         max_distances = self._compute_max_distances(max_coords, min_coords)
@@ -158,7 +165,6 @@ class QBCA:
             )
         self.n_dist_ += max_distances.size
         return max_distances
-    
 
     def _compute_min_distances(self, max_coords, min_coords):
         min_distances = np.zeros((len(max_coords), len(self.seeds)))
@@ -176,7 +182,6 @@ class QBCA:
 
         self.n_dist_ += min_distances.size
         return min_distances
-
 
     def _get_non_empty_bins(self):
         """
