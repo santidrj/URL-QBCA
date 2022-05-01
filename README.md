@@ -13,3 +13,5 @@ q = QBCA(n_clusters=3)
 predictions = q.fit_predict(X)
 
 ```
+
+The project dependencies are listed in the `pyproject.toml` file and can be installed using the [Poetry](https://python-poetry.org/ "Poetry - Python dependency management and packaging made easy") dependency manager or any other dependency manager.
