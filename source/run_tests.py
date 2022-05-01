@@ -14,6 +14,8 @@ from source.test_utils import (
     run_segmentation,
 )
 
+plt.style.use("ggplot")
+
 
 def test_gaussian(algorithms, out_file, option=0, verbose=False):
     if option == 0:
@@ -54,7 +56,9 @@ def test_image(algorithms, out_file, verbose=False):
     return metrics["#Distance computations"]
 
 
-plot_out = os.path.join("figures", "performance.png")
+plot_out_1 = os.path.join("figures", "gaussian-performance.png")
+plot_out_2 = os.path.join("figures", "real-data-performance.png")
+plot_out_3 = os.path.join("figures", "image-performance.png")
 fig, ax = plt.subplots()
 
 dist_com1 = test_gaussian(
@@ -71,9 +75,24 @@ dist_com4 = test_iris(initialize_algorithms(3, 1e-4, 30), "iris", verbose=True)
 
 dist_com5 = test_image(initialize_algorithms(5, 1e-2, 50), "butterfly")
 
-df = pd.concat([dist_com1, dist_com3, dist_com4], axis=1)
-df.columns = ["gaussian_5", "wine", "irirs"]
+df = pd.concat([dist_com1, dist_com2], axis=1)
+df.columns = ["Gaussian(5)", "Gaussian(25)"]
 ax = df.T.plot.bar(rot=0, title="Performance comparison", ylabel="#Distance computations")
 
 plt.tight_layout()
-plt.savefig(plot_out)
+plt.savefig(plot_out_1)
+plt.clf()
+
+df = pd.concat([dist_com3, dist_com4], axis=1)
+df.columns = ["wine", "irirs"]
+ax = df.T.plot.bar(rot=0, title="Performance comparison", ylabel="#Distance computations")
+
+plt.tight_layout()
+plt.savefig(plot_out_2)
+plt.clf()
+
+ax = dist_com5.plot.bar(rot=0, title="Performance comparison", ylabel="#Distance computations")
+
+plt.tight_layout()
+plt.savefig(plot_out_3)
+plt.clf()
