@@ -49,12 +49,20 @@ def test_iris(algorithms, out_file, verbose=False):
     return metrics["#Distance computations"]
 
 
-def test_image(algorithms, out_file, verbose=False):
+def test_butterfly(algorithms, out_file, verbose=False):
     print("Test Butterfly image")
-    data, im = load_image("butterfly")
+    data, im = load_image("butterfly", height=150)
     metrics = run_segmentation(out_file, algorithms, data, im, verbose=verbose)
     save_metrics(out_file, metrics)
     return metrics["#Distance computations"]
+
+def test_mononoke(algorithms, out_file, verbose=False):
+    print("Test Mononoke image")
+    data, im = load_image("mononoke")
+    metrics = run_segmentation(out_file, algorithms, data, im, verbose=verbose)
+    save_metrics(out_file, metrics)
+    return metrics["#Distance computations"]
+
 
 
 plot_out_1 = os.path.join("figures", "gaussian-performance.png")
@@ -74,32 +82,35 @@ fig, ax = plt.subplots()
 
 # dist_com4 = test_iris(initialize_algorithms(3, 1e-4, 30), "iris", verbose=True)
 
-dist_com5 = test_image(initialize_algorithms(5, 1e-2, 50), "butterfly")
+dist_com5 = test_butterfly(initialize_algorithms(5, 1e-2, 50), "butterfly")
 
-df = pd.concat([dist_com1, dist_com2], axis=1)
-df.columns = ["Gaussian(5)", "Gaussian(25)"]
+dist_com6 = test_mononoke(initialize_algorithms(5, 1e-2, 50), "mononoke")
+
+# df = pd.concat([dist_com1, dist_com2], axis=1)
+# df.columns = ["Gaussian(5)", "Gaussian(25)"]
+# ax = df.T.plot.bar(
+#     rot=0, title="Efficiency comparison", ylabel="#Distance computations"
+# )
+
+# plt.tight_layout()
+# plt.savefig(plot_out_1)
+# plt.clf()
+
+# df = pd.concat([dist_com4, dist_com3], axis=1)
+# df.columns = ["irirs", "wine"]
+# ax = df.T.plot.bar(
+#     rot=0, title="Efficiency comparison", ylabel="#Distance computations"
+# )
+
+# plt.tight_layout()
+# plt.savefig(plot_out_2)
+# plt.clf()
+
+df = pd.concat([dist_com5, dist_com6], axis=1)
+df.columns = ["butterfly", "mononoke"]
 ax = df.T.plot.bar(
-    rot=0, title="Efficiency comparison", ylabel="#Distance computations"
-)
-
-plt.tight_layout()
-plt.savefig(plot_out_1)
-plt.clf()
-
-df = pd.concat([dist_com4, dist_com3], axis=1)
-df.columns = ["irirs", "wine"]
-ax = df.T.plot.bar(
-    rot=0, title="Efficiency comparison", ylabel="#Distance computations"
-)
-
-plt.tight_layout()
-plt.savefig(plot_out_2)
-plt.clf()
-
-ax = dist_com5.plot.bar(
     rot=0, title="Efficiency comparison", ylabel="#Distance computations"
 )
 
 plt.tight_layout()
 plt.savefig(plot_out_3)
-plt.clf()

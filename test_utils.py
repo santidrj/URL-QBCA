@@ -45,7 +45,7 @@ def create_gaussian_25():
     )
 
 
-def load_image(filename, height=150):
+def load_image(filename, height=300):
     data_dir = "data"
     image = cv2.imread(os.path.join(data_dir, filename + ".jpg"))
     image = cv2.cvtColor(image, cv2.COLOR_BGR2Lab)
